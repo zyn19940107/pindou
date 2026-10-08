@@ -1,0 +1,28 @@
+# 依赖
+node_modules/
+
+# 生成产物（out/ 已有 337 个文件，每次生成都在变）
+out/
+# GUI 上传图片的临时目录
+_upload/
+
+# 模型权重：3 个 ONNX 共约 343MB
+# 换机器时需手动放置，或改用 Git LFS：
+#   git lfs track "models/*.onnx" && git add .gitattributes
+models/
+
+# 由 test/make-sample.mjs 生成（npm run demo 会自动先跑一遍）
+test/sample.png
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+*.log
+
+# 注意：input/ 目前是有意纳入版本库的——test/analyze.mjs 与 test/gui-api.mjs
+# 的回归用例依赖其中的 cat_benben.jpg。若日后放入不想外传的照片，
+# 在下面加一行排除即可：
+# input/*.jpg
+# input/*.png

@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>拼豆图纸生成器</title>
+<style>
+:root{--bd:#e3e6ec;--fg:#1c2024;--sub:#6b7280;--acc:#1668dc;--ok:#12a150;--warn:#d97706;--bad:#dc2626}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.6 -apple-system,"Microsoft YaHei","Segoe UI",sans-serif;color:var(--fg);background:#f5f6f8}
+header{display:flex;align-items:center;gap:16px;padding:12px 20px;background:#fff;border-bottom:1px solid var(--bd)}
+header h1{font-size:16px;margin:0;font-weight:600}
+header a{margin-left:auto;color:var(--sub);text-decoration:none;font-size:13px}
+header a:hover{color:var(--acc)}
+main{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:18px;padding:18px;align-items:start;max-width:1500px;margin:0 auto}
+@media(max-width:1000px){main{grid-template-columns:1fr}}
+.card{background:#fff;border:1px solid var(--bd);border-radius:10px;padding:16px;margin-bottom:14px}
+.card h2{font-size:14px;margin:0 0 12px;font-weight:600}
+#drop{border:2px dashed #c8cdd6;border-radius:10px;padding:34px 16px;text-align:center;color:var(--sub);cursor:pointer;transition:.15s}
+#drop:hover,#drop.over{border-color:var(--acc);background:#f0f6ff;color:var(--acc)}
+#stage{position:relative;display:none;margin-top:14px;line-height:0}
+#stage img{width:100%;height:auto;display:block;border-radius:6px}
+.ov{position:absolute;border:2px solid;border-radius:2px;pointer-events:none}
+.ov.bbox{border-color:rgba(22,104,220,.85)}
+.ov.crop{border-color:rgba(217,119,6,.95);border-style:dashed}
+.ov.eye{border-color:rgba(18,161,80,.9)}
+.ov span{position:absolute;left:0;top:-19px;font-size:11px;line-height:1.6;padding:0 5px;border-radius:3px;color:#fff;white-space:nowrap}
+.ov.bbox span{background:var(--acc)}.ov.crop span{background:var(--warn)}.ov.eye span{background:var(--ok)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:2px 0 8px}
+.chip{padding:5px 12px;border:1px solid var(--bd);border-radius:20px;background:#fff;cursor:pointer;font:inherit;font-size:13px;color:var(--fg)}
+.chip:hover{border-color:var(--acc);color:var(--acc)}
+.chip.on{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+.kv{font-size:13px;color:var(--sub)}
+.kv b{color:var(--fg);font-weight:600}
+.tag{display:inline-block;padding:1px 7px;border-radius:20px;font-size:12px;color:#fff}
+.tag.high{background:var(--ok)}.tag.medium{background:var(--warn)}.tag.low{background:var(--bad)}
+.hint{font-size:12px;color:var(--sub);margin-top:8px;padding:8px 10px;background:#fafbfc;border-left:3px solid var(--bd);border-radius:0 5px 5px 0}
+.hint.warn{border-left-color:var(--warn);background:#fffaf2}
+label{display:block;font-size:12px;color:var(--sub);margin-bottom:3px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+input,select{width:100%;padding:6px 8px;border:1px solid var(--bd);border-radius:6px;font:inherit;font-size:13px;background:#fff}
+input:focus,select:focus{outline:2px solid rgba(22,104,220,.35);border-color:var(--acc)}
+fieldset{border:0;padding:0;margin:0 0 14px}
+fieldset>legend{font-size:12px;font-weight:600;color:var(--sub);padding:0;margin-bottom:8px}
+button{padding:8px 14px;border:1px solid var(--bd);border-radius:6px;background:#fff;cursor:pointer;font:inherit;font-size:13px}
+button:hover{border-color:var(--acc);color:var(--acc)}
+button:disabled{opacity:.5;cursor-events:none}
+#gen{width:100%;padding:11px;background:var(--acc);color:#fff;border:0;font-size:15px;font-weight:600;border-radius:8px}
+#gen:hover:not(:disabled){background:#0f57b8}
+#resImg{width:100%;image-rendering:pixelated;border-radius:6px;border:1px solid var(--bd);display:block}
+#log{white-space:pre-wrap;font-size:12px;background:#1c2024;color:#d7dae0;padding:10px;border-radius:6px;max-height:220px;overflow:auto;margin:10px 0 0}
+</style>
+</head>
+<body>
+<header>
+  <h1>拼豆图纸生成器</h1>
+  <a href="/out/">产物列表 →</a>
+</header>
+
+<main>
+<div>
+  <div class="card">
+    <h2>1 · 选图</h2>
+    <div id="drop">把图片拖到这里，或点击选择<br><span style="font-size:12px">支持 png / jpg / webp / bmp / gif</span></div>
+    <input id="file" type="file" accept="image/*" hidden/>
+    <div id="stage">
+      <img id="src" alt=""/>
+      <div class="ov bbox" id="ovBbox" hidden><span>主体</span></div>
+      <div class="ov crop" id="ovCrop" hidden><span>裁剪区</span></div>
+      <div class="ov eye" id="ovEye" hidden><span>双眼</span></div>
+    </div>
+  </div>
+
+  <div class="card" id="anaCard" hidden>
+    <h2>2 · 自动分析</h2>
+    <div id="ana"></div>
+  </div>
+
+  <div class="card" id="resCard" hidden>
+    <h2>4 · 结果</h2>
+    <img id="resImg" alt="结果预览"/>
+    <div class="row" id="files" style="margin-top:12px"></div>
+    <pre id="log"></pre>
+  </div>
+</div>
+
+<div>
+  <div class="card">
+    <h2>3 · 参数</h2>
+    <form id="form" onsubmit="return false">
+      <fieldset>
+        <legend>图纸</legend>
+        <label>标题</label><input name="title" placeholder="默认用文件名"/>
+        <div class="grid2" style="margin-top:10px">
+          <div><label>格数</label><input name="size" value="45" placeholder="45 或 58x72"/></div>
+          <div><label>豆径 mm</label><input name="cellMm" type="number" step="0.1" value="5"/></div>
+        </div>
+        <div class="grid2" style="margin-top:10px">
+          <div><label>模式</label><select name="mode"><option value="color">彩色</option><option value="mono">单色</option></select></div>
+          <div><label>豆形</label><select name="shape"><option value="circle">圆形</option><option value="square">方块</option></select></div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>颜色</legend>
+        <label>色卡</label><select name="palette" id="palette">
+          <option value="midi">midi</option>
+          <option value="warm-nogreen">warm-nogreen</option>
+          <option value="warm-noncool">warm-noncool</option>
+        </select>
+        <div class="kv" id="palInfo" style="margin-top:5px"></div>
+
+        <label style="margin-top:14px">用色数量 <span class="kv">（越少越好买补，越多越像原图）</span></label>
+        <div class="chips" id="mcChips"></div>
+        <input name="maxColors" id="maxColors" type="number" min="2" max="99" value="24"/>
+        <div class="hint" id="mcHint"></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>构图</legend>
+        <label>裁剪 x,y,w,h（原图像素）</label>
+        <input name="crop" placeholder="留空＝按比例缩放；也可点上方建议一键填"/>
+        <div class="grid2" style="margin-top:10px">
+          <div><label>填充方式</label><select name="fit"><option value="cover">cover（铺满，裁边）</option><option value="contain">contain（补边）</option></select></div>
+          <div><label>四周留白</label><input name="buffer" type="number" step="0.05" min="0" max="0.4" placeholder="0"/></div>
+        </div>
+        <label style="margin-top:10px">锐化 <span class="kv">（缩放会糊掉睫毛，拉回来）</span></label>
+        <input name="sharpen" type="number" step="0.1" min="0" max="1.5" placeholder="0"/>
+      </fieldset>
+
+      <fieldset>
+        <legend>背景</legend>
+        <div class="grid2">
+          <div><label>底色</label><select name="bg">
+            <option value="auto">自动识别</option><option value="#FFFFFF">白</option><option value="#F5F0E8">米</option>
+          </select></div>
+          <div><label>方式</label><select name="bgMode"><option value="global">整片替换</option><option value="flood">只换边缘连通</option></select></div>
+        </div>
+        <label style="margin-top:10px">抠背景色数 <span class="kv">（0＝不抠）</span></label>
+        <input name="bgCut" type="number" min="0" max="8" placeholder="0"/>
+        <label style="margin-top:10px">主体包围盒 x,y,w,h <span class="kv">（框外当背景，比按颜色自动更可靠）</span></label>
+        <input name="bgBox" placeholder="如 120,60,300,400"/>
+        <label style="margin-top:10px">框外填色</label><input name="bgFill" placeholder="留空＝不放豆"/>
+      </fieldset>
+
+      <fieldset>
+        <legend>颜色整理</legend>
+        <div class="grid3">
+          <div><label>去碎点</label><input name="despeckle" type="number" min="0" max="3" value="1"/></div>
+          <div><label>稀疏色并入</label><input name="minCount" type="number" min="0" placeholder="关"/></div>
+          <div><label>预览倍率</label><input name="scale" type="number" min="4" max="40" value="12"/></div>
+        </div>
+        <div class="grid2" style="margin-top:10px">
+          <div><label>亮度</label><input name="brightness" type="number" step="0.05" placeholder="0"/></div>
+          <div><label>对比度</label><input name="contrast" type="number" step="0.05" placeholder="0"/></div>
+        </div>
+        <label style="margin-top:10px">饱和度</label><input name="saturation" type="number" step="0.05" placeholder="1"/>
+      </fieldset>
+    </form>
+    <button id="gen" disabled>生成图纸</button>
+  </div>
+</div>
+</main>
+
+<script>
+let imgPath = null, ana = null;
+const $ = (s) => document.querySelector(s);
+const form = $('#form');
+
+// ---- 用色数量 ----
+// 用预设按钮而不是滑块：拼豆是按套装档位买的，「26.5 色」没有意义，
+// 但仍保留数字输入做微调（有些图 20 色和 22 色差别很明显）。
+let pals = {};
+const PAL_PRESETS = [2, 4, 6, 8, 12, 16, 24, 32, 48];
+const mcEl = $('#maxColors');
+const palMax = () => Math.min(99, pals[$('#palette').value]?.count ?? 73);
+
+function mcAdvice(n) {
+  const max = palMax();
+  const tail = '这是上限，实际用色可能更少——取决于图片本身的颜色层次，生成后会显示真实种数。';
+  if (n >= max) return `全彩档：还原度最高，但 ${max} 种散色意味着几乎每种都要单独买或补货。${tail}`;
+  if (n <= 6) return '极简档：黑白灰就够，最好买最好补；代价是渐变和细节基本丢掉。' + tail;
+  if (n <= 12) return '少量档：适合单色系图案，仍可能有三四种要补货。' + tail;
+  if (n <= 20) return '适中档：常见套装基本覆盖，采购压力可控。' + tail;
+  return '丰富档：还原度高但散色偏多，补货麻烦，建议先做小样。' + tail;
+}
+
+function syncMc() {
+  const v = parseInt(mcEl.value, 10);
+  const cur = Number.isFinite(v) ? String(v) : '';
+  document.querySelectorAll('.chip').forEach((c) => c.classList.toggle('on', c.dataset.mc === cur));
+  $('#mcHint').textContent = Number.isFinite(v) ? mcAdvice(v) : '';
+}
+
+function syncPal() {
+  const max = palMax();
+  $('#palInfo').textContent = `共 ${max} 色可选，用色数量最多 ${max} 种`;
+  const all = document.querySelector('.chip[data-mc="all"]');
+  if (all) all.textContent = '全部 ' + max;
+  syncMc();
+}
+
+$('#mcChips').innerHTML = PAL_PRESETS.map((n) => `<button type="button" class="chip" data-mc="${n}">${n}</button>`).join('')
+  + '<button type="button" class="chip" data-mc="all">全部 73</button>';
+$('#mcChips').addEventListener('click', (e) => {
+  const b = e.target.closest('.chip');
+  if (!b) return;
+  mcEl.value = b.dataset.mc === 'all' ? palMax() : b.dataset.mc;
+  syncMc();
+});
+mcEl.addEventListener('input', syncMc);
+
+// 色数现取，色卡文件改了这里自动跟着变
+fetch('/api/palettes').then((r) => r.json()).then((d) => {
+  pals = d;
+  $('#palette').innerHTML = Object.entries(pals)
+    .map(([k, v]) => `<option value="${k}">${k}（${v.count} 色）</option>`).join('');
+  $('#palette').addEventListener('change', syncPal);
+  syncPal();
+}).catch(() => { syncPal(); });
+syncMc();
+
+const drop = $('#drop'), fileInput = $('#file');
+drop.onclick = () => fileInput.click();
+fileInput.onchange = () => fileInput.files[0] && upload(fileInput.files[0]);
+['dragenter','dragover'].forEach(e => drop.addEventListener(e, (ev) => { ev.preventDefault(); drop.classList.add('over'); }));
+['dragleave','drop'].forEach(e => drop.addEventListener(e, (ev) => { ev.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', (ev) => ev.dataTransfer.files[0] && upload(ev.dataTransfer.files[0]));
+
+async function post(url, body) {
+  const r = await fetch(url, { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify(body) });
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+  return j;
+}
+
+async function upload(f) {
+  if (f.size > 30 * 1024 * 1024) return alert('图片超过 30MB');
+  drop.textContent = '上传中…';
+  try {
+    const data = await new Promise((ok, no) => {
+      const fr = new FileReader();
+      fr.onload = () => ok(fr.result.split(',')[1]);
+      fr.onerror = no;
+      fr.readAsDataURL(f);
+    });
+    const up = await post('/api/upload', { name: f.name, data });
+    imgPath = up.path;
+    $('#src').src = up.url;
+    $('#stage').style.display = 'block';
+    $('#gen').disabled = false;
+    drop.innerHTML = '已载入 <b>' + f.name + '</b>　<span style="font-size:12px">换一张</span>';
+    analyze();
+  } catch (e) { drop.textContent = '上传失败：' + e.message; }
+}
+
+// 用百分比而不是像素定位：图片宽度随容器自适应变，百分比天然跟着缩放走，
+// 不用在 resize 时重新量 offsetWidth。
+const place = (el, r, W, H) => {
+  el.style.left = (r.x / W * 100) + '%';
+  el.style.top = (r.y / H * 100) + '%';
+  el.style.width = (r.w / W * 100) + '%';
+  el.style.height = (r.h / H * 100) + '%';
+};
+
+async function analyze() {
+  const gridSize = parseInt(form.size.value, 10) || 45;
+  let a;
+  try { a = await post('/api/analyze', { path: imgPath, gridSize }); }
+  catch (e) { $('#ana').textContent = '分析失败：' + e.message; return; }
+  ana = a;
+  const W = a.imageW, H = a.imageH, box = a.bbox;
+  $('#ovBbox').hidden = !box.found;
+  if (box.found) place($('#ovBbox'), box.bbox, W, H);
+
+  const out = [];
+  out.push('<div class="kv">原图 <b>' + W + '×' + H + '</b>　底色 rgb(' + box.bgColor + ')　主体占比 <b>' + ((box.coverage || 0) * 100).toFixed(1) + '%</b></div>');
+  if (box.found) {
+    const c = [box.crop.x, box.crop.y, box.crop.w, box.crop.h].join(',');
+    out.push('<div class="kv" style="margin-top:6px">建议裁剪 <b>' + c + '</b></div>');
+    out.push('<div class="row" style="margin-top:8px"><button data-crop="' + c + '">按建议裁剪</button></div>');
+  } else {
+    out.push('<div class="hint">没找到明显主体（纯色或满屏图），按整张生成即可。</div>');
+  }
+
+  const eye = a.eye;
+  if (eye && eye.found) {
+    place($('#ovEye'), eye.box, W, H);
+    $('#ovEye').hidden = false;
+    const lv = eye.confidence || 'high';
+    out.push('<hr style="border:0;border-top:1px solid #e3e6ec;margin:14px 0"/>');
+    out.push('<div class="kv">眼宽 <b>' + eye.eyePx + 'px</b>　置信 <span class="tag ' + lv + '">' + lv + '</span></div>');
+    out.push('<div class="kv" style="margin-top:6px">按当前裁剪：眼睛占 <b>' + eye.atCrop.cells + ' 格</b>（' + eye.atCrop.level + '）— ' + eye.atCrop.advice + '</div>');
+    if (eye.atCropMin.cells !== eye.atCrop.cells) out.push('<div class="kv">保守估计（单眼被遮挡时）<b>' + eye.atCropMin.cells + ' 格</b>（' + eye.atCropMin.level + '）</div>');
+    if (eye.note) out.push('<div class="hint warn">' + eye.note + '</div>');
+    const btns = eye.cropSuggest.map(s => '<button data-crop="' + s.crop + '">裁到 ' + s.cells + ' 格眼宽' + (s.clamped ? '（已夹到画面内）' : '') + '</button>').join('');
+    out.push('<div class="kv" style="margin:10px 0 6px">想要更大的眼睛 →</div><div class="row">' + btns + '</div>');
+    out.push('<div class="hint">格数按「成品一格 = 一颗豆」算，眼睛通常至少要占 6~8 格才看得出神。</div>');
+  } else if (eye) {
+    $('#ovEye').hidden = true;
+    out.push('<div class="hint">未检出眼部：' + eye.reason + '</div>');
+  }
+
+  $('#ana').innerHTML = out.join('');
+  $('#anaCard').hidden = false;
+  $('#ana').querySelectorAll('button[data-crop]').forEach(b => b.onclick = () => {
+    form.crop.value = b.dataset.crop;
+    const p = b.dataset.crop.split(',').map(Number);
+    place($('#ovCrop'), { x:p[0], y:p[1], w:p[2], h:p[3] }, W, H);
+    $('#ovCrop').hidden = false;
+    $('#ovCrop').querySelector('span').textContent = '裁剪区 ' + p[2] + '×' + p[3];
+  });
+}
+
+$('#gen').onclick = async () => {
+  if (!imgPath) return;
+  const params = {};
+  for (const el of form.elements) {
+    if (!el.name) continue;
+    params[el.name] = el.value;
+  }
+  params.size = params.size || '45';
+  const btn = $('#gen');
+  btn.disabled = true;
+  btn.textContent = '生成中…';
+  try {
+    const r = await post('/api/generate', { path: imgPath, params });
+    $('#resImg').src = '/out/' + r.dir + '/preview.png';
+    $('#resCard').hidden = false;
+    $('#resCard').scrollIntoView({ behavior:'smooth', block:'nearest' });
+    $('#files').innerHTML = r.files.map(f =>
+      '<a href="' + f.url + '" target="_blank" style="padding:6px 11px;border:1px solid #e3e6ec;border-radius:6px;text-decoration:none;color:#1668dc">' + f.name + '</a>').join('');
+    $('#log').textContent = r.log;
+    // 预设的 N 只是 k-means 的 K，实际用色可能少于它（图里没有那么多层颜色）。
+    // 采购看的是这个实际值，所以单独显示出来。
+    const used = (r.meta.colors || []).filter((c) => c.count > 0).length;
+    $('#resCard').querySelector('h2').innerHTML =
+      '4 · 结果　<span class="kv">设定上限 ' + (params.maxColors || 24) + ' 色，实际用了 ' + used + ' 种</span>';
+  } catch (e) {
+    $('#resCard').hidden = false;
+    $('#log').textContent = '生成失败：' + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '生成图纸';
+  }
+};
+</script>
+</body>
+</html>

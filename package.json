@@ -1,0 +1,26 @@
+{
+  "name": "pindou",
+  "version": "1.0.0",
+  "description": "图片转拼豆图纸生成器（30x30 / 45x45）",
+  "type": "module",
+  "scripts": {
+    "gen": "node gen.mjs",
+    "gui": "node serve.mjs",
+    "check:gui": "node test/gui-check.mjs",
+    "test:gui": "node test/gui-check.mjs && node test/gui-api.mjs",
+    "analyze": "node test/analyze.mjs",
+    "sample": "node test/make-sample.mjs",
+    "demo": "node test/make-sample.mjs && node gen.mjs -i test/sample.png -s 30 --bg auto --out out/demo"
+  },
+  "keywords": [
+    "perler",
+    "beads",
+    "pattern",
+    "拼豆"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@imgly/background-removal-node": "^1.4.5",
+    "jimp": "^1.6.1"
+  }
+}
